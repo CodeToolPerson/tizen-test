@@ -27,27 +27,11 @@ class _LoadingIndicatorDemoState extends State<LoadingIndicatorDemo> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 自定义加载指示器
-                CustomLoadingIndicator(
-                  size: 120.0,
-                  color: Colors.white,
-                  isAnimating: _isAnimating,
-                ),
+                CustomLoadingIndicator(size: 120.0, color: Colors.white, isAnimating: _isAnimating),
                 const SizedBox(height: 40),
-                // 控制按钮
-                ElevatedButton(
-                  onPressed: _toggleAnimation,
-                  child: Text(_isAnimating ? '停止动画' : '开始动画'),
-                ),
+                ElevatedButton(onPressed: _toggleAnimation, child: Text(_isAnimating ? '停止动画' : '开始动画')),
                 const SizedBox(height: 20),
-                // 显示当前状态
-                Text(
-                  '动画状态: ${_isAnimating ? "播放中" : "已停止"}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 16,
-                  ),
-                ),
+                Text('动画状态: ${_isAnimating ? "播放中" : "已停止"}', style: const TextStyle(color: Colors.white, fontSize: 16)),
               ],
             ),
           ),
