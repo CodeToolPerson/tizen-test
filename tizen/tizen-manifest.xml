@@ -8,4 +8,9 @@
         <metadata key="http://tizen.org/metadata/prefer_nuget_cache" value="true"/>
     </ui-application>
     <feature name="http://tizen.org/feature/screen.size.all"/>
+    <feature name="http://tizen.org/feature/network.internet"/>
+    <privileges>
+      <privilege>http://tizen.org/privilege/mediastorage</privilege>
+      <privilege>http://tizen.org/privilege/externalstorage.appdata</privilege>
+    </privileges>
 </manifest>
