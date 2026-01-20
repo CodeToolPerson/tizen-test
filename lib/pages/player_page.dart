@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:better_player_plus/better_player_plus.dart';
+import 'package:video_player/video_player.dart';
 import 'package:get/get.dart';
 
 class PlayerPage extends StatefulWidget {
@@ -14,7 +14,7 @@ class PlayerPage extends StatefulWidget {
 }
 
 class _PlayerPageState extends State<PlayerPage> {
-  BetterPlayerController? _betterPlayerController;
+  VideoPlayerController? _videoPlayerController;
   bool _isInitialized = false;
   String? _errorMessage;
 
@@ -35,115 +35,41 @@ class _PlayerPageState extends State<PlayerPage> {
         throw Exception('RTP 流媒体暂不支持，请使用 HTTP/HTTPS 流媒体源');
       }
 
-      await _initializeBetterPlayer();
+      await _initializeVideoPlayer();
 
-      setState(() {
-        _isInitialized = true;
-        _errorMessage = null;
-      });
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+          _errorMessage = null;
+        });
+      }
 
       print('播放器初始化成功: ${widget.title}');
     } catch (e) {
       print('播放器初始化失败: $e');
-      setState(() {
-        _errorMessage = e.toString();
-        _isInitialized = false;
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isInitialized = false;
+        });
+      }
     }
   }
 
-  Future<void> _initializeBetterPlayer() async {
-    BetterPlayerDataSource dataSource = BetterPlayerDataSource(
-      BetterPlayerDataSourceType.network,
-      widget.url,
-      headers: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
-      useAsmsSubtitles: true,
-      useAsmsTracks: true,
-      useAsmsAudioTracks: true,
-      bufferingConfiguration: const BetterPlayerBufferingConfiguration(
-        minBufferMs: 5000,
-        maxBufferMs: 25000,
-        bufferForPlaybackMs: 1000,
-        bufferForPlaybackAfterRebufferMs: 2500,
-      ),
+  Future<void> _initializeVideoPlayer() async {
+    _videoPlayerController = VideoPlayerController.networkUrl(
+      Uri.parse(widget.url),
+      httpHeaders: {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'},
     );
 
-    _betterPlayerController = BetterPlayerController(
-      BetterPlayerConfiguration(
-        autoPlay: true,
-        looping: false,
-        fullScreenByDefault: false,
-        aspectRatio: 16 / 9,
-        fit: BoxFit.contain,
-        controlsConfiguration: const BetterPlayerControlsConfiguration(
-          showControls: true,
-          enableSkips: true,
-          enableFullscreen: true,
-          enableSubtitles: true,
-          enableAudioTracks: true,
-          enableQualities: true,
-          enablePlayPause: true,
-          enableProgressBar: true,
-          enableMute: true,
-          showControlsOnInitialize: true,
-          controlsHideTime: Duration(seconds: 3),
-          playerTheme: BetterPlayerTheme.material,
-        ),
-        placeholder: Container(
-          color: Colors.black,
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircularProgressIndicator(color: Colors.white),
-                SizedBox(height: 16),
-                Text('正在加载...', style: TextStyle(color: Colors.white, fontSize: 16)),
-              ],
-            ),
-          ),
-        ),
-        errorBuilder: (context, errorMessage) {
-          return Container(
-            color: Colors.black,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, color: Colors.red, size: 64),
-                  const SizedBox(height: 16),
-                  const Text(
-                    '播放失败',
-                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    errorMessage ?? '未知错误',
-                    style: const TextStyle(color: Colors.grey, fontSize: 14),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: _retryPlayback,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('重试'),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+    await _videoPlayerController!.initialize().timeout(
+      const Duration(seconds: 10),
+      onTimeout: () {
+        throw Exception('播放器初始化超时');
+      },
     );
 
-    await _betterPlayerController!
-        .setupDataSource(dataSource)
-        .timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            throw Exception('播放器初始化超时');
-          },
-        );
+    await _videoPlayerController!.play();
   }
 
   void _retryPlayback() {
@@ -152,8 +78,8 @@ class _PlayerPageState extends State<PlayerPage> {
   }
 
   void _disposeControllers() {
-    _betterPlayerController?.dispose();
-    _betterPlayerController = null;
+    _videoPlayerController?.dispose();
+    _videoPlayerController = null;
   }
 
   @override
@@ -224,7 +150,7 @@ class _PlayerPageState extends State<PlayerPage> {
       );
     }
 
-    if (!_isInitialized || _betterPlayerController == null) {
+    if (!_isInitialized || _videoPlayerController == null) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -239,10 +165,79 @@ class _PlayerPageState extends State<PlayerPage> {
 
     return Stack(
       children: [
-        BetterPlayer(controller: _betterPlayerController!),
+        Center(
+          child: AspectRatio(
+            aspectRatio: _videoPlayerController!.value.aspectRatio,
+            child: VideoPlayer(_videoPlayerController!),
+          ),
+        ),
+        _buildVideoControls(),
 
         if (widget.channel != null) Positioned(left: 16, bottom: 120, right: 16, child: _buildChannelInfo()),
       ],
+    );
+  }
+
+  Widget _buildVideoControls() {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.5),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            IconButton(
+              icon: Icon(
+                _videoPlayerController!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                color: Colors.white,
+              ),
+              onPressed: () {
+                if (mounted) {
+                  setState(() {
+                    _videoPlayerController!.value.isPlaying
+                        ? _videoPlayerController!.pause()
+                        : _videoPlayerController!.play();
+                  });
+                }
+              },
+            ),
+            Expanded(
+              child: VideoProgressIndicator(
+                _videoPlayerController!,
+                allowScrubbing: true,
+                colors: const VideoProgressColors(
+                  playedColor: Colors.red,
+                  bufferedColor: Colors.white54,
+                  backgroundColor: Colors.white24,
+                ),
+              ),
+            ),
+            IconButton(
+              icon: Icon(
+                _videoPlayerController!.value.volume > 0 ? Icons.volume_up : Icons.volume_off,
+                color: Colors.white,
+              ),
+              onPressed: () {
+                if (mounted) {
+                  setState(() {
+                    _videoPlayerController!.setVolume(
+                      _videoPlayerController!.value.volume > 0 ? 0 : 1,
+                    );
+                  });
+                }
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.fullscreen, color: Colors.white),
+              onPressed: () {
+                // 全屏功能可以后续实现
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 

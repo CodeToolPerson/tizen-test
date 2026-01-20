@@ -9,8 +9,13 @@
     </ui-application>
     <feature name="http://tizen.org/feature/screen.size.all"/>
     <feature name="http://tizen.org/feature/network.internet"/>
+    <!-- 可选：声明支持 HLS/MP4，有助于兼容性 -->
+    <feature name="http://tizen.org/feature/player.hls"/>
+    <feature name="http://tizen.org/feature/player.mp4"/>
     <privileges>
       <privilege>http://tizen.org/privilege/mediastorage</privilege>
+      <privilege>http://tizen.org/privilege/externalstorage</privilege>
       <privilege>http://tizen.org/privilege/externalstorage.appdata</privilege>
+      <privilege>http://tizen.org/privilege/internet</privilege>
     </privileges>
 </manifest>

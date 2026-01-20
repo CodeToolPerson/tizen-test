@@ -257,3 +257,25 @@ https://live.iill.top/huya/11601966
 https://live.iill.top/huya/11352879
 #EXTINF:-1 tvg-logo="https://epg-1.iill.top/logo/虎牙.png" group-title="•影视「轮播」",中华小当家「动漫」
 https://live.iill.top/huya/11342413
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频1" tvg-logo="" group-title="•测试「视频」",测试直播流 TS
+http://line.ottcst.com/live/E7SSNGJZKC/SFNGLE33BR/1165173.ts
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频2" tvg-logo="" group-title="•测试「视频」",测试电影 MP4
+http://rights20063.cdn-akm.me/movie/2a305d32bfb4/38003fb8dd/713784.mp4
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频3" tvg-logo="" group-title="•测试「视频」",测试电影 MKV
+http://rights20063.cdn-akm.me/movie/2a305d32bfb4/38003fb8dd/1068329.mkv
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频4" tvg-logo="" group-title="•测试「视频」",测试电影 MKV 2
+http://rights20063.cdn-akm.me/movie/2a305d32bfb4/38003fb8dd/1068259.mkv
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频5" tvg-logo="" group-title="•测试「视频」",测试电影 OTT MKV
+http://line.ottcst.com/movie/E7SSNGJZKC/SFNGLE33BR/1156823.mkv
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频6" tvg-logo="" group-title="•测试「视频」",测试电影 HEVC MKV
+http://line.ottcst.com/movie/E7SSNGJZKC/SFNGLE33BR/1455613.mkv
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频7" tvg-logo="" group-title="•测试「视频」",测试电影 多音频 MKV
+http://line.ottcst.com:80/movie/E7SSNGJZKC/SFNGLE33BR/1521523.mkv
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频8" tvg-logo="" group-title="•测试「视频」",测试直播 MPEG2 TS 1
+http://line.ottcst.com/live/E7SSNGJZKC/SFNGLE33BR/11842.ts
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频9" tvg-logo="" group-title="•测试「视频」",测试直播 MPEG2 TS 2
+http://line.ottcst.com/live/E7SSNGJZKC/SFNGLE33BR/11841.ts
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频10" tvg-logo="" group-title="•测试「视频」",测试直播 MPEG2 TS 3
+http://line.ottcst.com/live/E7SSNGJZKC/SFNGLE33BR/11840.ts
+#EXTINF:-1 tvg-id="测试视频" tvg-name="测试视频11" tvg-logo="" group-title="•测试「视频」",测试直播 MPEG2 TS 4
+http://line.ottcst.com/live/E7SSNGJZKC/SFNGLE33BR/11838.ts
