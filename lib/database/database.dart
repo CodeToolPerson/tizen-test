@@ -1,20 +1,7 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:sqflite/sqflite.dart';
-import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:path/path.dart' as p;
-
-void initializeSqflite() {
-  // For true desktop Linux, use the FFI version
-  // For Tizen (recognized as Linux), use native sqflite (via the sqflite_tizen package)
-  if (Platform.isWindows || Platform.isMacOS || (Platform.isLinux && !Platform.environment.containsKey('TIZEN_API_VERSION'))) {
-    sqfliteFfiInit();
-    databaseFactory = databaseFactoryFfi;
-    print('Initialized sqflite FFI for desktop platform: ${Platform.operatingSystem}');
-  } else {
-    print('Using native sqflite for mobile/embedded platform: ${Platform.operatingSystem}');
-  }
-}
+import 'package:sembast/sembast_io.dart';
 
 // Channel data model
 class Channel {
@@ -47,24 +34,23 @@ class Channel {
   // Create a Channel object from a Map
   factory Channel.fromMap(Map<String, dynamic> map) {
     return Channel(
-      id: map['id'],
-      channelNumber: map['channelNumber'],
-      tvgId: map['tvgId'],
-      tvgName: map['tvgName'],
-      tvgLogo: map['tvgLogo'],
-      groupTitle: map['groupTitle'],
-      streamUrl: map['streamUrl'],
-      definition: map['definition'],
-      catchupSource: map['catchupSource'],
-      hasCatchup: map['hasCatchup'] == 1,
-      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt']) : null,
+      id: map['id'] as int?,
+      channelNumber: map['channelNumber'] as int,
+      tvgId: map['tvgId'] as String,
+      tvgName: map['tvgName'] as String,
+      tvgLogo: map['tvgLogo'] as String?,
+      groupTitle: map['groupTitle'] as String,
+      streamUrl: map['streamUrl'] as String,
+      definition: map['definition'] as String?,
+      catchupSource: map['catchupSource'] as String?,
+      hasCatchup: (map['hasCatchup'] as int?) == 1,
+      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : null,
     );
   }
 
-  // Convert to Map
+  // Convert to Map (for sembast storage, exclude id as it's managed by the store)
   Map<String, dynamic> toMap() {
     return {
-      'id': id,
       'channelNumber': channelNumber,
       'tvgId': tvgId,
       'tvgName': tvgName,
@@ -77,12 +63,20 @@ class Channel {
       'createdAt': createdAt?.toIso8601String(),
     };
   }
+
+  // Create a Channel object from a sembast record (includes the key as id)
+  factory Channel.fromRecord(RecordSnapshot<int, Map<String, dynamic>> record) {
+    final map = Map<String, dynamic>.from(record.value);
+    map['id'] = record.key; // Add the record key as id
+    return Channel.fromMap(map);
+  }
 }
 
 // Database management class
 class AppDatabase {
   static Database? _database;
-  static const String tableName = 'channels';
+  static const String storeName = 'channels';
+  static final store = intMapStoreFactory.store(storeName);
 
   // Singleton pattern
   static Future<Database> get database async {
@@ -93,113 +87,72 @@ class AppDatabase {
 
   // Initialize the database
   static Future<Database> _initDatabase() async {
-    initializeSqflite();
-
     late String path;
 
     try {
-      final databasesPath = await getDatabasesPath();
-      path = p.join(databasesPath, 'channels.db');
+      final appDir = await getApplicationDocumentsDirectory();
+      path = p.join(appDir.path, 'channels.db');
     } catch (e) {
-      print('getDatabasesPath failed: $e');
-      try {
-        final appDir = await getApplicationDocumentsDirectory();
-        path = p.join(appDir.path, 'channels.db');
-      } catch (e2) {
-        print('getApplicationDocumentsDirectory also failed: $e2');
-        final tempDir = Directory.systemTemp;
-        path = p.join(tempDir.path, 'tizentest_channels.db');
-        print('Using temp directory: ${tempDir.path}');
-      }
+      final tempDir = Directory.systemTemp;
+      path = p.join(tempDir.path, 'tizentest_channels.db');
     }
-
-    print('Database path: $path');
 
     final dir = Directory(p.dirname(path));
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
 
-    return await openDatabase(path, version: 1, onCreate: _onCreate);
-  }
-
-  // Create table
-  static Future<void> _onCreate(Database db, int version) async {
-    await db.execute('''
-      CREATE TABLE $tableName (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        channelNumber INTEGER NOT NULL,
-        tvgId TEXT NOT NULL,
-        tvgName TEXT NOT NULL,
-        tvgLogo TEXT,
-        groupTitle TEXT NOT NULL,
-        streamUrl TEXT NOT NULL,
-        definition TEXT,
-        catchupSource TEXT,
-        hasCatchup INTEGER DEFAULT 0,
-        createdAt TEXT DEFAULT CURRENT_TIMESTAMP
-      )
-    ''');
+    final databaseFactory = databaseFactoryIo;
+    return await databaseFactory.openDatabase(path);
   }
 
   // Insert Channel
   static Future<int> insertChannel(Channel channel) async {
     final db = await database;
-    return await db.insert(tableName, channel.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
+    return await store.add(db, channel.toMap());
   }
 
   // Batch insert channels
   static Future<void> insertChannels(List<Channel> channels) async {
     final db = await database;
-    final batch = db.batch();
-
-    for (final channel in channels) {
-      batch.insert(tableName, channel.toMap(), conflictAlgorithm: ConflictAlgorithm.replace);
-    }
-
-    await batch.commit(noResult: true);
+    await store.addAll(db, channels.map((channel) => channel.toMap()).toList());
   }
 
   // Get all channels
   static Future<List<Channel>> getAllChannels() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(tableName);
+    final records = await store.find(db);
 
-    return List.generate(maps.length, (i) {
-      return Channel.fromMap(maps[i]);
-    });
+    return records.map((record) => Channel.fromRecord(record)).toList();
   }
 
   // Search Channel
   static Future<List<Channel>> searchChannels(String query) async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.query(
-      tableName,
-      where: 'tvgName LIKE ? OR groupTitle LIKE ?',
-      whereArgs: ['%$query%', '%$query%'],
-    );
+    final finder = Finder(filter: Filter.or([Filter.matches('tvgName', query), Filter.matches('groupTitle', query)]));
 
-    return List.generate(maps.length, (i) {
-      return Channel.fromMap(maps[i]);
-    });
+    final records = await store.find(db, finder: finder);
+    return records.map((record) => Channel.fromRecord(record)).toList();
   }
 
   // Get Group List
   static Future<List<String>> getAllGroups() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT DISTINCT groupTitle FROM $tableName ORDER BY groupTitle');
+    final records = await store.find(db);
+    final groups = records.map((record) => record.value['groupTitle'] as String).toSet().toList()..sort();
 
-    return maps.map((map) => map['groupTitle'] as String).toList();
+    return groups;
   }
 
   // Get group statistics
   static Future<Map<String, int>> getGroupStatistics() async {
     final db = await database;
-    final List<Map<String, dynamic>> maps = await db.rawQuery('SELECT groupTitle, COUNT(*) as count FROM $tableName GROUP BY groupTitle');
-
+    final records = await store.find(db);
     final stats = <String, int>{};
-    for (final map in maps) {
-      stats[map['groupTitle'] as String] = map['count'] as int;
+
+    for (final record in records) {
+      final groupTitle = record.value['groupTitle'] as String;
+      stats[groupTitle] = (stats[groupTitle] ?? 0) + 1;
     }
 
     return stats;
@@ -208,14 +161,13 @@ class AppDatabase {
   // Get the total number of channels
   static Future<int> getTotalChannelCount() async {
     final db = await database;
-    final count = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM $tableName'));
-    return count ?? 0;
+    return await store.count(db);
   }
 
   // Clear all channels
   static Future<void> deleteAllChannels() async {
     final db = await database;
-    await db.delete(tableName);
+    await store.delete(db);
   }
 
   // Close the database
