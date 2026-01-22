@@ -292,10 +292,10 @@ packages:
     dependency: "direct main"
     description:
       name: sembast
-      sha256: "139cf71496105de32e7a08a4e3a1ead0f81c4a616ec9703ed07e8f0d10cdd505"
+      sha256: c8063c3146c3c8d5f5b04230de7682c768440a575fbda2634f14d22f263197c3
       url: "https://pub.dev"
     source: hosted
-    version: "3.8.6"
+    version: "3.8.5+2"
   sky_engine:
     dependency: transitive
     description: flutter
@@ -526,5 +526,5 @@ packages:
     source: hosted
     version: "1.1.0"
 sdks:
-  dart: ">=3.10.0 <4.0.0"
+  dart: ">=3.9.2 <4.0.0"
   flutter: ">=3.35.0"
