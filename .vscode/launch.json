@@ -6,7 +6,7 @@
             "request": "attach",
             "type": "dart",
             "cwd": "${workspaceFolder}",
-            "vmServiceUri": "http://127.0.0.1:63644/92AaFhIGHqk=/"
+            "vmServiceUri": "http://127.0.0.1:65128/jpUBYfuccoA=/"
         }
     ]
 }

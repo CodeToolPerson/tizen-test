@@ -81,17 +81,16 @@ class M3UParser {
         }
       }
 
-      return Channel(
-        channelNumber: channelNumber,
-        tvgId: tvgId,
-        tvgName: channelName,
-        tvgLogo: tvgLogo,
-        groupTitle: groupTitle,
-        streamUrl: urlLine.trim(),
-        definition: definition,
-        catchupSource: catchupSource,
-        hasCatchup: hasCatchup,
-      );
+      return Channel()
+        ..channelNumber = channelNumber
+        ..tvgId = tvgId
+        ..tvgName = channelName
+        ..tvgLogo = tvgLogo
+        ..groupTitle = groupTitle
+        ..streamUrl = urlLine.trim()
+        ..definition = definition
+        ..catchupSource = catchupSource
+        ..hasCatchup = hasCatchup;
     } catch (e) {
       print('解析频道失败: $extinfLine, 错误: $e');
       return null;

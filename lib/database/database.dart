@@ -1,179 +1,219 @@
 import 'dart:io';
+import 'package:hive_ce/hive.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;
-import 'package:sembast/sembast_io.dart';
+import 'channel.dart';
+import 'vod_item.dart';
+import 'series_item.dart';
 
-// Channel data model
-class Channel {
-  final int? id;
-  final int channelNumber;
-  final String tvgId;
-  final String tvgName;
-  final String? tvgLogo;
-  final String groupTitle;
-  final String streamUrl;
-  final String? definition;
-  final String? catchupSource;
-  final bool hasCatchup;
-  final DateTime? createdAt;
+export 'channel.dart';
+export 'vod_item.dart';
+export 'series_item.dart';
 
-  Channel({
-    this.id,
-    required this.channelNumber,
-    required this.tvgId,
-    required this.tvgName,
-    this.tvgLogo,
-    required this.groupTitle,
-    required this.streamUrl,
-    this.definition,
-    this.catchupSource,
-    this.hasCatchup = false,
-    this.createdAt,
-  });
-
-  // Create a Channel object from a Map
-  factory Channel.fromMap(Map<String, dynamic> map) {
-    return Channel(
-      id: map['id'] as int?,
-      channelNumber: map['channelNumber'] as int,
-      tvgId: map['tvgId'] as String,
-      tvgName: map['tvgName'] as String,
-      tvgLogo: map['tvgLogo'] as String?,
-      groupTitle: map['groupTitle'] as String,
-      streamUrl: map['streamUrl'] as String,
-      definition: map['definition'] as String?,
-      catchupSource: map['catchupSource'] as String?,
-      hasCatchup: (map['hasCatchup'] as int?) == 1,
-      createdAt: map['createdAt'] != null ? DateTime.parse(map['createdAt'] as String) : null,
-    );
-  }
-
-  // Convert to Map (for sembast storage, exclude id as it's managed by the store)
-  Map<String, dynamic> toMap() {
-    return {
-      'channelNumber': channelNumber,
-      'tvgId': tvgId,
-      'tvgName': tvgName,
-      'tvgLogo': tvgLogo,
-      'groupTitle': groupTitle,
-      'streamUrl': streamUrl,
-      'definition': definition,
-      'catchupSource': catchupSource,
-      'hasCatchup': hasCatchup ? 1 : 0,
-      'createdAt': createdAt?.toIso8601String(),
-    };
-  }
-
-  // Create a Channel object from a sembast record (includes the key as id)
-  factory Channel.fromRecord(RecordSnapshot<int, Map<String, dynamic>> record) {
-    final map = Map<String, dynamic>.from(record.value);
-    map['id'] = record.key; // Add the record key as id
-    return Channel.fromMap(map);
-  }
-}
-
-// Database management class
+// 数据库管理类
 class AppDatabase {
-  static Database? _database;
-  static const String storeName = 'channels';
-  static final store = intMapStoreFactory.store(storeName);
+  static Box<Channel>? _channelBox;
+  static Box<VodItem>? _vodBox;
+  static Box<SeriesItem>? _seriesBox;
 
-  // Singleton pattern
-  static Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
-    return _database!;
-  }
+  static const String channelBoxName = 'channels';
+  static const String vodBoxName = 'vod_items';
+  static const String seriesBoxName = 'series_items';
 
-  // Initialize the database
-  static Future<Database> _initDatabase() async {
+  // 初始化 Hive
+  static Future<void> init() async {
+    if (Hive.isBoxOpen(channelBoxName)) return;
+
     late String path;
 
     try {
       final appDir = await getApplicationDocumentsDirectory();
-      path = p.join(appDir.path, 'channels.db');
+      path = appDir.path;
     } catch (e) {
       final tempDir = Directory.systemTemp;
-      path = p.join(tempDir.path, 'tizentest_channels.db');
+      path = tempDir.path;
     }
 
-    final dir = Directory(p.dirname(path));
+    final dir = Directory(path);
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
 
-    final databaseFactory = databaseFactoryIo;
-    return await databaseFactory.openDatabase(path);
+    Hive.init(path);
+
+    // 注册适配器
+    if (!Hive.isAdapterRegistered(0)) {
+      Hive.registerAdapter(ChannelAdapter());
+    }
+    if (!Hive.isAdapterRegistered(1)) {
+      Hive.registerAdapter(VodItemAdapter());
+    }
+    if (!Hive.isAdapterRegistered(2)) {
+      Hive.registerAdapter(SeriesItemAdapter());
+    }
+
+    _channelBox = await Hive.openBox<Channel>(channelBoxName);
+    _vodBox = await Hive.openBox<VodItem>(vodBoxName);
+    _seriesBox = await Hive.openBox<SeriesItem>(seriesBoxName);
   }
 
-  // Insert Channel
+  // ==================== Channel 操作 ====================
+
+  static Future<Box<Channel>> get channelBox async {
+    if (_channelBox == null || !_channelBox!.isOpen) {
+      await init();
+    }
+    return _channelBox!;
+  }
+
   static Future<int> insertChannel(Channel channel) async {
-    final db = await database;
-    return await store.add(db, channel.toMap());
+    final box = await channelBox;
+    return await box.add(channel);
   }
 
-  // Batch insert channels
   static Future<void> insertChannels(List<Channel> channels) async {
-    final db = await database;
-    await store.addAll(db, channels.map((channel) => channel.toMap()).toList());
+    final box = await channelBox;
+    await box.addAll(channels);
   }
 
-  // Get all channels
   static Future<List<Channel>> getAllChannels() async {
-    final db = await database;
-    final records = await store.find(db);
-
-    return records.map((record) => Channel.fromRecord(record)).toList();
+    final box = await channelBox;
+    return box.values.toList();
   }
 
-  // Search Channel
   static Future<List<Channel>> searchChannels(String query) async {
-    final db = await database;
-    final finder = Finder(filter: Filter.or([Filter.matches('tvgName', query), Filter.matches('groupTitle', query)]));
-
-    final records = await store.find(db, finder: finder);
-    return records.map((record) => Channel.fromRecord(record)).toList();
+    final box = await channelBox;
+    final lowerQuery = query.toLowerCase();
+    return box.values.where((channel) {
+      return channel.tvgName.toLowerCase().contains(lowerQuery) ||
+          channel.groupTitle.toLowerCase().contains(lowerQuery);
+    }).toList();
   }
 
-  // Get Group List
   static Future<List<String>> getAllGroups() async {
-    final db = await database;
-    final records = await store.find(db);
-    final groups = records.map((record) => record.value['groupTitle'] as String).toSet().toList()..sort();
-
+    final box = await channelBox;
+    final groups = box.values.map((c) => c.groupTitle).toSet().toList()..sort();
     return groups;
   }
 
-  // Get group statistics
   static Future<Map<String, int>> getGroupStatistics() async {
-    final db = await database;
-    final records = await store.find(db);
+    final box = await channelBox;
     final stats = <String, int>{};
 
-    for (final record in records) {
-      final groupTitle = record.value['groupTitle'] as String;
-      stats[groupTitle] = (stats[groupTitle] ?? 0) + 1;
+    for (final channel in box.values) {
+      stats[channel.groupTitle] = (stats[channel.groupTitle] ?? 0) + 1;
     }
 
     return stats;
   }
 
-  // Get the total number of channels
   static Future<int> getTotalChannelCount() async {
-    final db = await database;
-    return await store.count(db);
+    final box = await channelBox;
+    return box.length;
   }
 
-  // Clear all channels
   static Future<void> deleteAllChannels() async {
-    final db = await database;
-    await store.delete(db);
+    final box = await channelBox;
+    await box.clear();
   }
 
-  // Close the database
+  // ==================== VOD 操作 ====================
+
+  static Future<Box<VodItem>> get vodBox async {
+    if (_vodBox == null || !_vodBox!.isOpen) {
+      await init();
+    }
+    return _vodBox!;
+  }
+
+  static Future<void> insertVodItems(List<VodItem> items) async {
+    final box = await vodBox;
+    await box.addAll(items);
+  }
+
+  static Future<List<VodItem>> getAllVodItems() async {
+    final box = await vodBox;
+    return box.values.toList();
+  }
+
+  static Future<List<VodItem>> searchVodItems(String query) async {
+    final box = await vodBox;
+    final lowerQuery = query.toLowerCase();
+    return box.values.where((item) {
+      return item.name.toLowerCase().contains(lowerQuery) ||
+          item.categoryName.toLowerCase().contains(lowerQuery);
+    }).toList();
+  }
+
+  static Future<int> getTotalVodCount() async {
+    final box = await vodBox;
+    return box.length;
+  }
+
+  static Future<void> deleteAllVodItems() async {
+    final box = await vodBox;
+    await box.clear();
+  }
+
+  // ==================== Series 操作 ====================
+
+  static Future<Box<SeriesItem>> get seriesBox async {
+    if (_seriesBox == null || !_seriesBox!.isOpen) {
+      await init();
+    }
+    return _seriesBox!;
+  }
+
+  static Future<void> insertSeriesItems(List<SeriesItem> items) async {
+    final box = await seriesBox;
+    await box.addAll(items);
+  }
+
+  static Future<List<SeriesItem>> getAllSeriesItems() async {
+    final box = await seriesBox;
+    return box.values.toList();
+  }
+
+  static Future<int> getTotalSeriesCount() async {
+    final box = await seriesBox;
+    return box.length;
+  }
+
+  static Future<void> deleteAllSeriesItems() async {
+    final box = await seriesBox;
+    await box.clear();
+  }
+
+  // ==================== 统计和清理 ====================
+
+  /// 获取所有数据统计
+  static Future<Map<String, int>> getAllStatistics() async {
+    return {
+      'channels': await getTotalChannelCount(),
+      'vod': await getTotalVodCount(),
+      'series': await getTotalSeriesCount(),
+    };
+  }
+
+  /// 清空所有数据
+  static Future<void> deleteAllData() async {
+    await deleteAllChannels();
+    await deleteAllVodItems();
+    await deleteAllSeriesItems();
+  }
+
+  // 关闭数据库
   static Future<void> close() async {
-    final db = await database;
-    db.close();
-    _database = null;
+    if (_channelBox != null && _channelBox!.isOpen) {
+      await _channelBox!.close();
+      _channelBox = null;
+    }
+    if (_vodBox != null && _vodBox!.isOpen) {
+      await _vodBox!.close();
+      _vodBox = null;
+    }
+    if (_seriesBox != null && _seriesBox!.isOpen) {
+      await _seriesBox!.close();
+      _seriesBox = null;
+    }
   }
 }
